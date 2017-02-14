@@ -1,0 +1,108 @@
+---
+title: "Practical Machine Learning Course: Prediction Assignment Writeup"
+author: "Pandromeda"
+date: "February 13, 2017"
+output: html_document
+---
+
+Prediction Assignment Writeup
+=================================================================
+
+This is the submitted file for prediction assignment in Practical Machine Learning Course.
+
+##Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information from the website [http://groupware.les.inf.puc-rio.br/har](http://groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset).
+
+## Project goal
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+## Data
+
+The data for this project come from this source: [http://groupware.les.inf.puc-rio.br/har](http://groupware.les.inf.puc-rio.br/har). If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+Training data:
+[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv)
+
+Test data:
+[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)
+
+
+Dataset citation: *Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.* 
+
+More detailed information about the data from the site: Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Programming report
+### Step 1. Load data
+
+When in the work directory where the training and test data is (download directly or use download.file), load the file, convert outcome columne *classe* to factor. 
+At the top ot the code also load the packages used in this project:
+```{r readfile, message=FALSE, warning=FALSE}
+library(caret)
+library(randomForest)
+trainFile<-read.csv("pml-training.csv", stringsAsFactors = FALSE)
+testFile<-read.csv("pml-testing.csv", stringsAsFactors = FALSE)
+trainFile$classe <- factor(trainFile$classe)
+
+```
+
+### Step 2. Clean up data
+
+The columns either contains no NA or mostly NAs, so get rid of the columns with NA, also delete character columns such as user name, and irrelevant columns like row num and timestamp; wherever removes training data, remove the same column for test data:
+
+```{r clean, message=FALSE, warning=FALSE}
+colNoNa <- (colSums(is.na(trainFile)) == 0)
+## Removes NA columns
+trainNoNa <- trainFile[, colNoNa]
+testNoNa <- testFile[, colNoNa]
+## Removes Character columns
+trainNoChar <- trainNoNa[, !sapply(trainNoNa, is.character)]
+testNoChar <- testNoNa[, !sapply(trainNoNa, is.character)]
+## Removes irrelevant columns
+trainClean <- trainNoChar[, !grepl("X|timestamp", names(trainNoChar))]
+testClean <- testNoChar[, !grepl("X|timestamp", names(trainNoChar))]
+```
+
+### Step 3 Split data
+
+Split training data to set aside 50% of the data for cross validation (usually can use fewer % for validation, but the training data is big and takes time to build model, so chose to use fewer % for training)
+```{r split, message=FALSE, warning=FALSE}
+##Set random seed for reproducibility
+set.seed(13579)
+
+##Split training data 50% (for training) - 50% (for validation)
+trainIndex <- createDataPartition(trainClean$classe, p = 0.50, list = FALSE)
+trainData <- trainClean[trainIndex, ]
+valData <- trainClean[-trainIndex, ]
+
+```
+
+### Step 4 Set up model with train data (Random Forest) and run cross validation
+
+Using 50% of the training data, set up the model (this part takes a long time so I set the rmd to eval=FALSE, showing the code but not run, only run once on my PC)
+```{r train, message=FALSE, warning=FALSE, eval=FALSE}
+##Fit the model with Random Forest algorithm
+Fit <- train(classe ~ ., data = trainData, method = "rf")
+Fit
+Fit$finalModel
+
+predictionVal <- predict(Fit,newdata = valData)
+confusionMatrix(valData$classe, predictionVal)
+
+```
+From the training data only, out-of-bag(OOB) estimate of  error rate is 0.42%. 
+From the validation, the estimation of out-of-sample error is given by (1- Accuracy) = approximately 0.41% with 95% CI of 0.29%~0.55% . 
+
+### Step 5. Predict on test data:
+
+```{r predict, eval=FALSE}
+predictionTest <- predict(Fit,newdata = testClean)
+```
+
+predictionTest holds the 20 results for the quiz.
